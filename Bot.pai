@@ -1,0 +1,46 @@
+import telebot
+import google.generativeai as genai
+
+# === ТВОИ КЛЮЧИ ===
+TELEGRAM_TOKEN = '8500878184:AAFh1beEL5_TRfoWC7hSNbGBfk1aNFSVtPs'
+GEMINI_KEY = 'AIzaSyDsPEUIYbptBFT2zFoZ7n-elYOl_xB5hSY'
+ADMIN_ID = 8511239888
+# =================
+
+genai.configure(api_key=GEMINI_KEY)
+model = genai.GenerativeModel('gemini-pro')
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    if message.chat.id == ADMIN_ID:
+        bot.send_message(ADMIN_ID, "Привет, Босс! Я на связи. Все сообщения от игроков будут падать сюда.")
+    else:
+        bot.send_message(message.chat.id, "Привет! Я ИИ-Ассистент сервера. Задай свой вопрос, и я отвечу.")
+
+@bot.message_handler(func=lambda message: True)
+def handle_all_messages(message):
+    try:
+        if message.chat.id == ADMIN_ID:
+            # Тут логика для тебя: если ты пересылаешь сообщение игрока боту и пишешь ответ
+            if message.reply_to_message:
+                # Если ты ответил на пересланное сообщение игрока — бот отправит твой ответ ему
+                original_user_id = message.reply_to_message.forward_from.id
+                bot.send_message(original_user_id, message.text)
+                bot.send_message(ADMIN_ID, "Ответ отправлен игроку!")
+            else:
+                bot.send_message(ADMIN_ID, "Босс, если хочешь ответить игроку — нажми 'Reply' на его сообщении.")
+        
+        else:
+            # Логика для игроков (ИИ отвечает + пересылает тебе)
+            response = model.generate_content(f"Ты помощник в Майнкрафте. Ответь игроку: {message.text}")
+            bot.reply_to(message, response.text)
+            
+            # Пересылаем тебе сообщение игрока, чтобы ты был в курсе
+            bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
+            bot.send_message(ADMIN_ID, f"👆 Игрок @{message.from_user.username} спрашивает это. Я ответил ему сам, но ты можешь вмешаться.")
+
+    except Exception as e:
+        print(f"Ошибка: {e}")
+
+bot.polling(none_stop=True)
